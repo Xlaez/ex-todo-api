@@ -1,0 +1,33 @@
+version: "3.8"
+
+services:
+  db:
+    restart: always
+    image: postgres:13-alpine
+    volumes:
+      - postgres_data_store:/var/lib/postgresql/data/
+       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    env_file:
+      - .env
+    environment:
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password123
+      - POSTGRES_DB=todo_app
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+  pgadmin:
+    container_name: pgadmin
+    image: dpage/pgadmin4
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=pgadmin4@pgadmin.org
+      - PGADMIN_DEFAULT_PASSWORD=admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - db
+
+volumes:
+  postgres_data_store:
