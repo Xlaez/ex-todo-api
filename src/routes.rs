@@ -6,12 +6,13 @@ use axum::{
 };
 
 use crate::{
-    handlers::{health_checker_handler},
+    handlers::{health_checker_handler, create_user_handler},
     AppState,
 };
 
 pub fn create_router(app_state: Arc<AppState>) -> Router{
     Router::new()
         .route("/api/health_checker", get(health_checker_handler))
+        .route("/api/user/register", post(create_user_handler))
         .with_state(app_state)
 }

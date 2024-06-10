@@ -16,8 +16,6 @@ pub struct CreateUserSchema {
     pub username: String,
     pub email: String,
     pub password: String,
-    pub email_verified: bool,
-    pub img: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

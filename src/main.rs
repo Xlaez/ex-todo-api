@@ -2,6 +2,7 @@ mod routes;
 mod handlers;
 mod schemas;
 mod models;
+mod utils;
 
 use std::sync::Arc;
 
