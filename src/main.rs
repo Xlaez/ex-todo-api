@@ -3,6 +3,7 @@ mod handlers;
 mod schemas;
 mod models;
 mod utils;
+mod middlewares;
 
 use std::sync::Arc;
 
