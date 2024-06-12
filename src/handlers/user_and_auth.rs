@@ -5,7 +5,7 @@ use serde_json::json;
 use sqlx::PgPool;
 
 use crate::{
-    models::UserModel, schemas::{CreateUserSchema, LoginSchema, UserResponse}, utils::{encode_jwt, hash_password, verify_password}, AppState
+    models::{OtpModel, UserModel}, schemas::{CreateUserSchema, LoginSchema, OtpSchema, UserResponse}, utils::{encode_jwt, generate_otp, hash_password, send_otp_mail, verify_password}, AppState
 };
 
 pub async fn create_user_handler(
@@ -29,10 +29,21 @@ pub async fn create_user_handler(
     ).fetch_one(&data.db).await;
 
     match query_result {
-        Ok(user) => {
+        Ok(_) => {
             let user_response = json!({"status": "success", "data": json!({
                 "message": "Account created successfully"
             })});
+
+            let otp_code = generate_otp(5);
+
+            let otp_body = OtpSchema{
+                email: body.email.clone().to_string(),
+                otp: otp_code.clone().to_string(),
+            };
+
+            otp_creator_service(State(data.clone()), Json((otp_body))).await;
+
+            send_otp_mail(&body.email, &otp_code, &body.username).await;
 
             return Ok((StatusCode::CREATED, Json(user_response)));
         }
@@ -80,6 +91,11 @@ pub async fn login_handler( State(data): State<Arc<AppState>>,
                     }
                 };
 
+                if user.email_verified == Some(false){
+                    let error_response = serde_json::json!({"status": "fail", "message": "Please verify your email first"});
+                    return Err((StatusCode::BAD_REQUEST, Json(error_response)));
+                }
+
                 let user_response: UserResponse = user.into();
 
                     let user_response = serde_json::json!({"status": "success", "data": serde_json::json!({
@@ -101,3 +117,21 @@ pub async fn login_handler( State(data): State<Arc<AppState>>,
         }
     }
     }
+
+    pub async fn otp_creator_service( State(data): State<Arc<AppState>>, Json(otp_body): Json<OtpSchema>)  -> Result<String, (StatusCode, Json<serde_json::Value>)> {
+     let query_result = sqlx::query_as!(
+         OtpModel,
+         "INSERT INTO otps (email,otp) VALUES ($1,$2) RETURNING *",
+         otp_body.email,
+         otp_body.otp,
+    ).fetch_one(&data.db).await;
+
+    match  query_result {
+        Ok(_) => 
+            Ok(otp_body.otp),
+        Err(_) => {
+             let error_response = serde_json::json!({"status": "fail", "message": "Cannot create OTP"});
+                    Err((StatusCode::INTERNAL_SERVER_ERROR, Json(error_response)))
+        }
+    }
+}
