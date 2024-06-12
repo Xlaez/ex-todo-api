@@ -5,7 +5,7 @@ use serde_json::json;
 use sqlx::PgPool;
 
 use crate::{
-    models::{OtpModel, UserModel}, schemas::{CreateUserSchema, LoginSchema, OtpSchema, UserResponse}, utils::{encode_jwt, generate_otp, hash_password, send_otp_mail, verify_password}, AppState
+    models::{OtpModel, UserModel}, schemas::{CreateUserSchema, LoginSchema, OtpSchema, UserResponse, VerifyEmailSchema}, utils::{check_otp_expiry, encode_jwt, generate_otp, hash_password, send_otp_mail, verify_password}, AppState
 };
 
 pub async fn create_user_handler(
@@ -116,6 +116,53 @@ pub async fn login_handler( State(data): State<Arc<AppState>>,
             Err((StatusCode::BAD_REQUEST, Json(error_response)))
         }
     }
+    }
+
+    pub async fn verify_email(State(data): State<Arc<AppState>>,
+    Json(body): Json<VerifyEmailSchema>,) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)>{
+
+        let otp_doc = otp_fetch_service(State(data), &body.otp).await;
+        
+            let error_response = serde_json::json!({"status": "fail", "message": "Invalid or expired otp"});
+
+
+       match otp_doc{
+         Some(otp_doc) => {
+            if otp_doc.otp.len() == 0 || otp_doc.email != body.email.to_string(){
+              return  Err((StatusCode::BAD_REQUEST, Json(error_response)));                
+            }
+
+           if let Some(created_at) = otp_doc.created_at{
+             match check_otp_expiry(&created_at.to_rfc3339()){
+                Ok(_) => {
+                    let response = serde_json::json!({"status": "success", "data": serde_json::json!({
+                        "status": "success"
+                    })});
+
+                    Ok(Json(response))
+                },
+                Err(_err) => Err((StatusCode::BAD_REQUEST, Json(error_response)))
+            }
+           }else {
+              return  Err((StatusCode::BAD_REQUEST, Json(error_response)));                
+           }
+        }
+        None => {
+            Err((StatusCode::BAD_REQUEST, Json(error_response)))
+        }
+       }
+    }
+
+    pub async fn otp_fetch_service( State(data): State<Arc<AppState>>, otp: &str) ->Option<OtpModel> {
+        match sqlx::query_as!(
+            OtpModel,
+            "SELECT * FROM otps WHERE otp = $1", 
+            otp.to_string(),
+        ).fetch_one(&data.db).await
+
+        {
+            Ok(otp_docs) => Some(otp_docs),Err(_) => None,
+        }
     }
 
     pub async fn otp_creator_service( State(data): State<Arc<AppState>>, Json(otp_body): Json<OtpSchema>)  -> Result<String, (StatusCode, Json<serde_json::Value>)> {

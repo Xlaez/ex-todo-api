@@ -1,5 +1,7 @@
+use chrono::{DateTime, Duration, Utc};
+use std::str::FromStr;
+
 use rand::{thread_rng, Rng};
-use rand::distributions::Alphanumeric;
 
 // Function to generate a numeric OTP
 pub fn generate_otp(length: usize) -> String {
@@ -8,4 +10,18 @@ pub fn generate_otp(length: usize) -> String {
         .map(|_| rng.gen_range(0..10).to_string())
         .collect();
     otp
+}
+
+pub fn check_otp_expiry(created_at: &str) -> Result<(), &'static str>{
+    let created_at = DateTime::from_str(created_at).map_err(|_| "Invalid datetime format")?;
+
+    let current_time = Utc::now();
+    
+    let duration = current_time - created_at;
+
+     if duration > Duration::minutes(4) {
+        Err("OTP expired")
+    } else {
+        Ok(())
+    }
 }

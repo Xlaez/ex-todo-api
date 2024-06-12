@@ -43,3 +43,10 @@ pub struct  UpdateUserSchema{
     pub password: Option<String>,
     pub img: Option<String>,
 }
+
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct VerifyEmailSchema {
+    pub email: String,
+    pub otp: String,
+}
