@@ -41,11 +41,16 @@ pub async fn create_user_handler(
                 otp: otp_code.clone().to_string(),
             };
 
-            otp_creator_service(State(data.clone()), Json((otp_body))).await;
+            match otp_creator_service(State(data.clone()), Json((otp_body))).await{
+                Ok(_) => {
+                    send_otp_mail(&body.email, &otp_code, &body.username).await;
 
-            send_otp_mail(&body.email, &otp_code, &body.username).await;
-
-            return Ok((StatusCode::CREATED, Json(user_response)));
+                     return Ok((StatusCode::CREATED, Json(user_response)));
+                },
+                Err(e)=>{
+                return Err(e);
+                }
+            }
         }
         Err(e) => {
             if e.to_string().contains("duplicate key value violates unique constraint"){
@@ -121,7 +126,7 @@ pub async fn login_handler( State(data): State<Arc<AppState>>,
     pub async fn verify_email(State(data): State<Arc<AppState>>,
     Json(body): Json<VerifyEmailSchema>,) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)>{
 
-        let otp_doc = otp_fetch_service(State(data), &body.otp).await;
+        let otp_doc = otp_fetch_service(&data.db, &body.otp).await;
         
             let error_response = serde_json::json!({"status": "fail", "message": "Invalid or expired otp"});
 
@@ -135,11 +140,39 @@ pub async fn login_handler( State(data): State<Arc<AppState>>,
            if let Some(created_at) = otp_doc.created_at{
              match check_otp_expiry(&created_at.to_rfc3339()){
                 Ok(_) => {
-                    let response = serde_json::json!({"status": "success", "data": serde_json::json!({
-                        "status": "success"
-                    })});
 
-                    Ok(Json(response))
+                     let user = get_user_by_email(&body.email, &data.db).await; 
+
+                     match user {
+                        Some(_) => {
+
+                            let now = chrono::Utc::now();
+
+                            let query_result = sqlx::query_as!(UserModel, "UPDATE users SET email_verified=$1, updated_at=$2 WHERE email=$3 RETURNING *",
+                                Some(true),
+                                now,
+                                &body.email,
+                            ).fetch_one(&data.db).await;
+
+                            match query_result {
+                                Ok(_) => {
+                                    let response = serde_json::json!({"status": "success", "data": serde_json::json!({
+                                    "status": "success"
+                                })});
+
+                            Ok(Json(response))
+                                }
+                                Err(err) => {
+                                    return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"status": "fail", "message": format!("{:?}", err)})),))
+                                }
+                            }
+                            
+                        }
+                        None =>{
+                             let error_response = serde_json::json!({"status": "fail", "message": "Cannot verify this email"});
+                                Err((StatusCode::BAD_REQUEST, Json(error_response)))
+                        }
+                     }
                 },
                 Err(_err) => Err((StatusCode::BAD_REQUEST, Json(error_response)))
             }
@@ -153,12 +186,12 @@ pub async fn login_handler( State(data): State<Arc<AppState>>,
        }
     }
 
-    pub async fn otp_fetch_service( State(data): State<Arc<AppState>>, otp: &str) ->Option<OtpModel> {
+    pub async fn otp_fetch_service( pool: &PgPool, otp: &str) ->Option<OtpModel> {
         match sqlx::query_as!(
             OtpModel,
             "SELECT * FROM otps WHERE otp = $1", 
             otp.to_string(),
-        ).fetch_one(&data.db).await
+        ).fetch_one(pool).await
 
         {
             Ok(otp_docs) => Some(otp_docs),Err(_) => None,
