@@ -1,11 +1,13 @@
-use std::{fmt::format, sync::Arc};
+use std::{fmt::format, io::Write, sync::Arc};
 
-use axum::{body, extract::State, http::StatusCode, response::IntoResponse, Json};
+use axum::{body, extract::{Multipart, State}, http::StatusCode, response::IntoResponse, Extension, Json};
+use cloudinary::upload::result::UploadResult;
 use serde_json::json;
 use sqlx::PgPool;
+use tempfile::NamedTempFile;
 
 use crate::{
-    models::{OtpModel, UserModel}, schemas::{CreateUserSchema, LoginSchema, OtpSchema, UserResponse, VerifyEmailSchema}, utils::{check_otp_expiry, encode_jwt, generate_otp, hash_password, send_otp_mail, verify_password}, AppState
+    models::{OtpModel, UserModel}, schemas::{CreateUserSchema, LoginSchema, OtpSchema, UserResponse, VerifyEmailSchema}, utils::{check_otp_expiry, encode_jwt, generate_otp, hash_password, send_otp_mail, upload_to_cloud, verify_password}, AppState
 };
 
 pub async fn create_user_handler(
@@ -214,4 +216,66 @@ pub async fn login_handler( State(data): State<Arc<AppState>>,
                     Err((StatusCode::INTERNAL_SERVER_ERROR, Json(error_response)))
         }
     }
-}
+    }
+
+    pub async fn upload_img(State(data): State<Arc<AppState>>, Extension(current_user): Extension<UserModel> ,mut multipart: Multipart) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)>{
+        while let Some(mut field) = multipart.next_field().await.unwrap() {
+            let filename = if let Some(filename) = field.file_name(){
+                filename.to_string()
+            }else{
+                continue;
+            };
+
+            let mut temp_file = NamedTempFile::new().expect("Failed to create temporary file for upload");
+
+            while let Some(chunk) = field.chunk().await.unwrap(){
+                temp_file.write_all(&chunk).expect("Failed to write chunk to tempfile");
+            }
+
+            let temp_path = temp_file.into_temp_path();
+
+          match upload_to_cloud(&filename, &temp_path).await {
+            Ok(result) => {
+                println!("Upload successful");
+
+                let result_str = match result {
+                    UploadResult::Success(success_data) => {
+                        success_data.secure_url
+                    },
+                    UploadResult::Error(_) => {
+                        let error_response = serde_json::json!({"status": "fail", "message": "cannot upload image to cloud"});
+                        return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(error_response)));
+                    }
+                };
+
+                let now = chrono::Utc::now();
+
+                let query_result = sqlx::query_as!(UserModel, "UPDATE users SET img=$1, updated_at=$2 WHERE email=$3 RETURNING *",
+                    result_str,
+                    now,
+                    &current_user.email,
+                ).fetch_one(&data.db).await;
+
+                match query_result {
+                    Ok(_) => {
+                        let response = serde_json::json!({"status": "success", "data": serde_json::json!({
+                            "status": "success"
+                        })});
+
+                        return Ok(response.to_string());
+                    }
+                    Err(err) => {
+                        return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"status": "fail", "message": format!("{:?}", err)}))));
+                    }
+                }
+            }
+                Err(e) => {
+                     let error_response = serde_json::json!({"status": "fail", "message": "Cannot upload image"});
+                    return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(error_response)));
+                }
+            }
+        }
+
+        let error_response = serde_json::json!({"status": "fail", "message": "No fields to process"});
+    Err((StatusCode::BAD_REQUEST, Json(error_response)))
+    }

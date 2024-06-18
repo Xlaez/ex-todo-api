@@ -1,13 +1,11 @@
 use std::sync::Arc;
 
 use axum::{
-    routing::{get, post, delete, put},
-    Router,
+    middleware::{from_fn, from_fn_with_state}, routing::{delete, get, patch, post, put}, Router
 };
 
 use crate::{
-    handlers::{create_user_handler, health_checker_handler, login_handler, verify_email},
-    AppState,
+    handlers::{create_user_handler, health_checker_handler, login_handler, upload_img, verify_email}, middlewares::authorize_user, AppState
 };
 
 pub fn create_router(app_state: Arc<AppState>) -> Router{
@@ -16,5 +14,6 @@ pub fn create_router(app_state: Arc<AppState>) -> Router{
         .route("/api/user/register", post(create_user_handler))
         .route("/api/user/login", post(login_handler))
         .route("/api/user/verify_email", post(verify_email))
+        .route("/api/user/update/img", patch(upload_img).layer(from_fn_with_state(app_state.clone(),authorize_user)))
         .with_state(app_state)
 }
