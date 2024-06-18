@@ -7,7 +7,7 @@ use sqlx::PgPool;
 use tempfile::NamedTempFile;
 
 use crate::{
-    models::{OtpModel, UserModel}, schemas::{CreateUserSchema, LoginSchema, OtpSchema, UserResponse, VerifyEmailSchema}, utils::{check_otp_expiry, encode_jwt, generate_otp, hash_password, send_otp_mail, upload_to_cloud, verify_password}, AppState
+    models::{OtpModel, UserModel}, schemas::{CreateUserSchema, LoginSchema, OtpSchema, UpdatePasswordSchema, UserResponse, VerifyEmailSchema}, utils::{check_otp_expiry, encode_jwt, generate_otp, hash_password, send_otp_mail, upload_to_cloud, verify_password}, AppState
 };
 
 pub async fn create_user_handler(
@@ -277,5 +277,46 @@ pub async fn login_handler( State(data): State<Arc<AppState>>,
         }
 
         let error_response = serde_json::json!({"status": "fail", "message": "No fields to process"});
-    Err((StatusCode::BAD_REQUEST, Json(error_response)))
+        Err((StatusCode::BAD_REQUEST, Json(error_response)))
     }
+
+    pub async fn update_password(State(data): State<Arc<AppState>>, Extension(current_user): Extension<UserModel>, Json(update_body): Json<UpdatePasswordSchema>) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)>{
+        let now = chrono::Utc::now();
+
+            let valid_password = verify_password(&current_user.password.to_string(), &update_body.old_password).map_err(|_e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"status": "fail", "message": format!("Cannot verify password")}))
+        )})?;
+
+        if !valid_password{
+            let error_response = serde_json::json!({"status": "fail", "message": "Password does not match"});
+            return Err((StatusCode::BAD_REQUEST, Json(error_response)));
+        }
+
+        let hashed_password = hash_password(&update_body.new_password.to_string()).map_err(|_e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"status": "fail", "message": format!("Cannot hash password")}))
+            )
+        })?;
+
+        let query_result = sqlx::query_as!(UserModel, "UPDATE users SET password=$1, updated_at=$2 WHERE email=$3 RETURNING *",
+        hashed_password.to_string(),
+        now,
+        &current_user.email,
+        ).fetch_one(&data.db).await;
+
+        match query_result {
+            Ok(_) => {
+                let response = serde_json::json!({"status": "success", "data": serde_json::json!({
+                    "status": "success"
+                })});
+
+            Ok(Json(response))
+            }
+            Err(err) => {
+                return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"status": "fail", "message": format!("{:?}", err)})),))
+            }
+        }
+
+
+}

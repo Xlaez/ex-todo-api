@@ -50,3 +50,9 @@ pub struct VerifyEmailSchema {
     pub email: String,
     pub otp: String,
 }
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct UpdatePasswordSchema {
+    pub old_password: String,
+    pub new_password: String,
+}
