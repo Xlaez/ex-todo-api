@@ -18,12 +18,12 @@ A Simple Todo API built with Rust and Axum
 
 ### Current Endpoints
 
-- */api/health_checker* health checker (GET)
-- */api/user/register* register endpoint (POST)
-- */api/user/login* login endpoint (POST)
-- */api/user/verify_email* verify email endpoint (POST)
-- */api/user/update/img* upload/update profile image (PATCH)
-- */api/user/update/password* change password (PATCH)
+- health checker (GET) -------- */api/health_checker*
+- register endpoint (POST) -------- */api/user/register*
+- login endpoint (POST) -------- */api/user/login*
+- verify email endpoint (POST) --------- */api/user/verify_email*
+- upload/update profile image (PATCH) --------- */api/user/update/img*
+- change password (PATCH) --------- */api/user/update/password*
 
 ### Usage
 
