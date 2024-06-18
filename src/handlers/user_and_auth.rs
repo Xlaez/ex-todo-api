@@ -1,8 +1,8 @@
 use std::{fmt::format, io::Write, sync::Arc};
 
-use axum::{body, extract::{Multipart, State}, http::StatusCode, response::IntoResponse, Extension, Json};
+use axum::{body, extract::{Multipart, Path, State}, http::StatusCode, response::IntoResponse, Extension, Json};
 use cloudinary::upload::result::UploadResult;
-use serde_json::json;
+use serde_json::{json, Value};
 use sqlx::PgPool;
 use tempfile::NamedTempFile;
 
@@ -123,18 +123,18 @@ pub async fn login_handler( State(data): State<Arc<AppState>>,
             Err((StatusCode::BAD_REQUEST, Json(error_response)))
         }
     }
-    }
+}
 
-    pub async fn verify_email(State(data): State<Arc<AppState>>,
+pub async fn verify_email(State(data): State<Arc<AppState>>,
     Json(body): Json<VerifyEmailSchema>,) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)>{
 
-        let otp_doc = otp_fetch_service(&data.db, &body.otp).await;
+    let otp_doc = otp_fetch_service(&data.db, &body.otp).await;
         
-            let error_response = serde_json::json!({"status": "fail", "message": "Invalid or expired otp"});
+    let error_response = serde_json::json!({"status": "fail", "message": "Invalid or expired otp"});
 
 
-       match otp_doc{
-         Some(otp_doc) => {
+    match otp_doc{
+        Some(otp_doc) => {
             if otp_doc.otp.len() == 0 || otp_doc.email != body.email.to_string(){
               return  Err((StatusCode::BAD_REQUEST, Json(error_response)));                
             }
@@ -143,9 +143,9 @@ pub async fn login_handler( State(data): State<Arc<AppState>>,
              match check_otp_expiry(&created_at.to_rfc3339()){
                 Ok(_) => {
 
-                     let user = get_user_by_email(&body.email, &data.db).await; 
+                    let user = get_user_by_email(&body.email, &data.db).await; 
 
-                     match user {
+                    match user {
                         Some(_) => {
 
                             let now = chrono::Utc::now();
@@ -186,26 +186,26 @@ pub async fn login_handler( State(data): State<Arc<AppState>>,
             Err((StatusCode::BAD_REQUEST, Json(error_response)))
         }
        }
+}
+
+pub async fn otp_fetch_service( pool: &PgPool, otp: &str) ->Option<OtpModel> {
+    match sqlx::query_as!(
+        OtpModel,
+        "SELECT * FROM otps WHERE otp = $1", 
+        otp.to_string(),
+    ).fetch_one(pool).await
+
+    {
+        Ok(otp_docs) => Some(otp_docs),Err(_) => None,
     }
+}
 
-    pub async fn otp_fetch_service( pool: &PgPool, otp: &str) ->Option<OtpModel> {
-        match sqlx::query_as!(
-            OtpModel,
-            "SELECT * FROM otps WHERE otp = $1", 
-            otp.to_string(),
-        ).fetch_one(pool).await
-
-        {
-            Ok(otp_docs) => Some(otp_docs),Err(_) => None,
-        }
-    }
-
-    pub async fn otp_creator_service( State(data): State<Arc<AppState>>, Json(otp_body): Json<OtpSchema>)  -> Result<String, (StatusCode, Json<serde_json::Value>)> {
-     let query_result = sqlx::query_as!(
-         OtpModel,
-         "INSERT INTO otps (email,otp) VALUES ($1,$2) RETURNING *",
-         otp_body.email,
-         otp_body.otp,
+pub async fn otp_creator_service( State(data): State<Arc<AppState>>, Json(otp_body): Json<OtpSchema>)  -> Result<String, (StatusCode, Json<serde_json::Value>)> {
+    let query_result = sqlx::query_as!(
+        OtpModel,
+        "INSERT INTO otps (email,otp) VALUES ($1,$2) RETURNING *",
+        otp_body.email,
+        otp_body.otp,
     ).fetch_one(&data.db).await;
 
     match  query_result {
@@ -216,25 +216,25 @@ pub async fn login_handler( State(data): State<Arc<AppState>>,
                     Err((StatusCode::INTERNAL_SERVER_ERROR, Json(error_response)))
         }
     }
-    }
+}
 
-    pub async fn upload_img(State(data): State<Arc<AppState>>, Extension(current_user): Extension<UserModel> ,mut multipart: Multipart) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)>{
-        while let Some(mut field) = multipart.next_field().await.unwrap() {
-            let filename = if let Some(filename) = field.file_name(){
-                filename.to_string()
-            }else{
-                continue;
-            };
+pub async fn upload_img(State(data): State<Arc<AppState>>, Extension(current_user): Extension<UserModel> ,mut multipart: Multipart) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)>{
+    while let Some(mut field) = multipart.next_field().await.unwrap() {
+        let filename = if let Some(filename) = field.file_name(){
+            filename.to_string()
+        }else{
+            continue;
+        };
 
-            let mut temp_file = NamedTempFile::new().expect("Failed to create temporary file for upload");
+        let mut temp_file = NamedTempFile::new().expect("Failed to create temporary file for upload");
 
-            while let Some(chunk) = field.chunk().await.unwrap(){
-                temp_file.write_all(&chunk).expect("Failed to write chunk to tempfile");
-            }
+        while let Some(chunk) = field.chunk().await.unwrap(){
+            temp_file.write_all(&chunk).expect("Failed to write chunk to tempfile");
+        }
 
-            let temp_path = temp_file.into_temp_path();
+        let temp_path = temp_file.into_temp_path();
 
-          match upload_to_cloud(&filename, &temp_path).await {
+        match upload_to_cloud(&filename, &temp_path).await {
             Ok(result) => {
                 println!("Upload successful");
 
@@ -269,54 +269,86 @@ pub async fn login_handler( State(data): State<Arc<AppState>>,
                     }
                 }
             }
-                Err(e) => {
-                     let error_response = serde_json::json!({"status": "fail", "message": "Cannot upload image"});
+            Err(e) => {
+                    let error_response = serde_json::json!({"status": "fail", "message": "Cannot upload image"});
                     return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(error_response)));
-                }
             }
         }
-
-        let error_response = serde_json::json!({"status": "fail", "message": "No fields to process"});
-        Err((StatusCode::BAD_REQUEST, Json(error_response)))
     }
 
-    pub async fn update_password(State(data): State<Arc<AppState>>, Extension(current_user): Extension<UserModel>, Json(update_body): Json<UpdatePasswordSchema>) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)>{
-        let now = chrono::Utc::now();
+    let error_response = serde_json::json!({"status": "fail", "message": "No fields to process"});
+    Err((StatusCode::BAD_REQUEST, Json(error_response)))
+}
 
-            let valid_password = verify_password(&current_user.password.to_string(), &update_body.old_password).map_err(|_e| {
+pub async fn update_password(State(data): State<Arc<AppState>>, Extension(current_user): Extension<UserModel>, Json(update_body): Json<UpdatePasswordSchema>) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)>{
+    let now = chrono::Utc::now();
+
+    let valid_password = verify_password(&current_user.password.to_string(), &update_body.old_password).map_err(|_e| {
+    (
+        StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"status": "fail", "message": format!("Cannot verify password")}))
+    )})?;
+
+    if !valid_password{
+        let error_response = serde_json::json!({"status": "fail", "message": "Password does not match"});
+        return Err((StatusCode::BAD_REQUEST, Json(error_response)));
+    }
+
+    let hashed_password = hash_password(&update_body.new_password.to_string()).map_err(|_e| {
         (
-            StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"status": "fail", "message": format!("Cannot verify password")}))
-        )})?;
+            StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"status": "fail", "message": format!("Cannot hash password")}))
+        )
+    })?;
 
-        if !valid_password{
-            let error_response = serde_json::json!({"status": "fail", "message": "Password does not match"});
-            return Err((StatusCode::BAD_REQUEST, Json(error_response)));
+    let query_result = sqlx::query_as!(UserModel, "UPDATE users SET password=$1, updated_at=$2 WHERE email=$3 RETURNING *",
+    hashed_password.to_string(),
+    now,
+    &current_user.email,
+    ).fetch_one(&data.db).await;
+
+    match query_result {
+        Ok(_) => {
+            let response = serde_json::json!({
+                "status": "success"
+            });
+
+        Ok(Json(response))
         }
-
-        let hashed_password = hash_password(&update_body.new_password.to_string()).map_err(|_e| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"status": "fail", "message": format!("Cannot hash password")}))
-            )
-        })?;
-
-        let query_result = sqlx::query_as!(UserModel, "UPDATE users SET password=$1, updated_at=$2 WHERE email=$3 RETURNING *",
-        hashed_password.to_string(),
-        now,
-        &current_user.email,
-        ).fetch_one(&data.db).await;
-
-        match query_result {
-            Ok(_) => {
-                let response = serde_json::json!({"status": "success", "data": serde_json::json!({
-                    "status": "success"
-                })});
-
-            Ok(Json(response))
-            }
-            Err(err) => {
-                return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"status": "fail", "message": format!("{:?}", err)})),))
-            }
+        Err(err) => {
+            return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"status": "fail", "message": format!("{:?}", err)})),))
         }
+    }
+}
 
+pub async fn get_user_by_username(State(data): State<Arc<AppState>>, Path(username): Path<String>)-> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
+    let query_result =  sqlx::query_as!(UserModel, "SELECT * FROM users WHERE username = $1", username).fetch_one(&data.db).await;
 
+    match query_result{
+        Ok(user) => {
+                let user_response: UserResponse = user.into();
+                let response = serde_json::json!({
+                  "status": "success",
+                  "data": user_response
+            	});
+            	
+            return Ok(Json(response));
+        }
+        Err(err) =>{
+
+            let error_response: Value;
+
+            if err.to_string() == "no rows returned by a query that expected to return at least one row" {
+                let message = "User not found";
+                error_response = json!({
+                    "status": "fail",
+                    "message":  message.to_string(),
+                });   
+            }else{
+                 error_response = json!({
+                    "status": "fail",
+                    "message":  format!("{:?}", err),
+                });   
+            }
+            Err((StatusCode::NOT_FOUND, Json(error_response)))
+        }
+    }
 }
