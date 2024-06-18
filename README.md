@@ -6,7 +6,7 @@ A Simple Todo API built with Rust and Axum
 
 - Register
 - Login
-_ Upload Avatar
+- Upload Avatar
 - Update Email
 - Update Password
 - Forget and Recover Password
@@ -15,6 +15,15 @@ _ Upload Avatar
 - Update Todo List
 - Delete Todo List
 - Fetch All & Single Todo List(s)
+
+### Current Endpoints
+
+- */api/health_checker* health checker (GET)
+- */api/user/register* register endpoint (POST)
+- */api/user/login* login endpoint (POST)
+- */api/user/verify_email* verify email endpoint (POST)
+- */api/user/update/img* upload/update profile image (PATCH)
+- */api/user/update/password* change password (PATCH)
 
 ### Usage
 
