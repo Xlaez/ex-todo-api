@@ -69,6 +69,40 @@ pub async fn add_list_handler(
     }
 }
 
+pub async fn get_users_lists_handler(
+    State(data): State<Arc<AppState>>,
+    Extension(current_user): Extension<UserModel>,
+) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
+    match sqlx::query!("SELECT * FROM lists WHERE user_id = $1", current_user.id)
+        .fetch_all(&data.db)
+        .await
+    {
+        Ok(rows) => {
+            let lists: Vec<ListModel> = rows
+                .into_iter()
+                .map(|row| ListModel {
+                    id: row.id,
+                    title: row.title,
+                    user_id: row.user_id.unwrap(),
+                    descr: row.descr,
+                    body: row.body,
+                    importance: row.importance.unwrap(),
+                    created_at: row.created_at,
+                    updated_at: row.updated_at,
+                })
+                .collect();
+
+            let response = serde_json::json!({"status": "success", "data": {"lists": lists}});
+            Ok(Json(response))
+        }
+        Err(err) => {
+            let error_response =
+                json!({"status": "fail", "message": format!("Cannot fetch lists: {:?}", err)});
+            Err((StatusCode::INTERNAL_SERVER_ERROR, Json(error_response)))
+        }
+    }
+}
+
 pub async fn get_list_by_title<'a>(
     title: &'a str,
     user_id: &'a Uuid,
