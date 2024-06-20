@@ -1,16 +1,14 @@
-use std::sync::Arc;
-
+use crate::{handlers::get_user_by_email, utils::decode_jwt, AppState};
 use axum::{
     body::Body,
-    extract::{State, FromRequestParts},
+    extract::State,
     http::{header, Request, StatusCode},
     middleware::Next,
     response::{IntoResponse, Response},
     Json,
 };
 use serde_json::json;
-
-use crate::{handlers::get_user_by_email, utils::decode_jwt, AppState};
+use std::sync::Arc;
 
 pub async fn authorize_user(
     State(data): State<Arc<AppState>>,
@@ -21,7 +19,9 @@ pub async fn authorize_user(
     let error_response = json!({"status": "fail", "message": "Provide a valid auth header"});
 
     let auth_header = match auth_header {
-        Some(header) => header.to_str().map_err(|_| (StatusCode::FORBIDDEN, Json(error_response.clone())))?,
+        Some(header) => header
+            .to_str()
+            .map_err(|_| (StatusCode::FORBIDDEN, Json(error_response.clone())))?,
         None => return Err((StatusCode::FORBIDDEN, Json(error_response))),
     };
 
