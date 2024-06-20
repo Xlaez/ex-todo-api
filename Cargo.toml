@@ -7,6 +7,7 @@ edition = "2021"
 anyhow = "1.0.86"
 argon2 = "0.5.3"
 axum = { version = "0.7.3", features = ["multipart"]}
+axum-macros = "0.4.1"
 chrono = { version = "0.4.24", features = ["serde"] }
 cloudinary = "0.4.0"
 dotenv = "0.15.0"
