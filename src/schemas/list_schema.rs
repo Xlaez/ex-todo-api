@@ -20,3 +20,10 @@ pub struct CreateListSchema {
     pub body: Option<String>,
     pub importance: String, // high, medium , low
 }
+
+#[derive(Deserialize)]
+pub struct PaginationSchema {
+    pub page: Option<usize>,
+    pub page_size: Option<usize>,
+    pub search_title: Option<String>,
+}

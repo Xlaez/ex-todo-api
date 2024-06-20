@@ -1,10 +1,10 @@
 use crate::{
     models::{ListModel, UserModel},
-    schemas::CreateListSchema,
+    schemas::{CreateListSchema, PaginationSchema},
     AppState,
 };
 use axum::{
-    extract::{Extension, Json, State},
+    extract::{Extension, Json, Query, State},
     http::StatusCode,
     response::IntoResponse,
 };
@@ -72,10 +72,38 @@ pub async fn add_list_handler(
 pub async fn get_users_lists_handler(
     State(data): State<Arc<AppState>>,
     Extension(current_user): Extension<UserModel>,
+    Query(pagination): Query<PaginationSchema>,
 ) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
-    match sqlx::query!("SELECT * FROM lists WHERE user_id = $1", current_user.id)
-        .fetch_all(&data.db)
-        .await
+    let page = pagination.page.unwrap_or(1);
+    let page_size = (pagination.page_size.unwrap_or(10));
+    let offset = ((page - 1) * page_size) as i64;
+
+    let search_title = pagination.search_title.unwrap_or_default();
+    let search_pattern = format!("%{}%", search_title);
+
+    let total_count = sqlx::query!(
+        "SELECT COUNT(*) FROM lists WHERE user_id = $1 AND title ILIKE $2",
+        current_user.id,
+        search_pattern
+    )
+    .fetch_one(&data.db)
+    .await
+    .map(|row| row.count)
+    .unwrap_or(Some(0));
+
+    let has_more = total_count > Some(offset + page_size as i64);
+    let next_page = if has_more { Some(page + 1) } else { None };
+    let prev_page = if page > 1 { Some(page - 1) } else { None };
+
+    match sqlx::query!(
+        "SELECT * FROM lists WHERE user_id = $1 AND title ILIKE $2 LIMIT $3 OFFSET $4",
+        current_user.id,
+        search_pattern,
+        page_size as i64,
+        offset
+    )
+    .fetch_all(&data.db)
+    .await
     {
         Ok(rows) => {
             let lists: Vec<ListModel> = rows
@@ -92,7 +120,17 @@ pub async fn get_users_lists_handler(
                 })
                 .collect();
 
-            let response = serde_json::json!({"status": "success", "data": {"lists": lists}});
+            let response = serde_json::json!({
+            "status": "success",
+            "data":
+            {
+                "lists": lists,
+                "hasMore": has_more,
+                "nextPage": next_page,
+                "prevPage": prev_page,
+                "totalCount": total_count
+            }});
+
             Ok(Json(response))
         }
         Err(err) => {
