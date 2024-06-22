@@ -8,10 +8,10 @@ mod middlewares;
 use std::sync::Arc;
 
 
-use axum::http::{header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE}, HeaderValue, Method};
+use axum::http::{header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE}, Method};
 use dotenv::dotenv;
 use routes::create_router;
-use sqlx::{pool, postgres::PgPoolOptions, Pool, Postgres};
+use sqlx::{postgres::PgPoolOptions, Pool, Postgres};
 use tower_http::cors::CorsLayer;
 
 

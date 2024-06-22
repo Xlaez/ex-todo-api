@@ -11,7 +11,7 @@ use axum::{
 use axum_macros::debug_handler;
 use chrono::Utc;
 use serde_json::json;
-use sqlx::{query, PgPool};
+use sqlx::{PgPool};
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -107,7 +107,7 @@ pub async fn get_users_lists_handler(
     Query(pagination): Query<PaginationSchema>,
 ) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
     let page = pagination.page.unwrap_or(1);
-    let page_size = (pagination.page_size.unwrap_or(10));
+    let page_size = pagination.page_size.unwrap_or(10);
     let offset = ((page - 1) * page_size) as i64;
 
     let search_title = pagination.search_title.unwrap_or_default();

@@ -1,6 +1,6 @@
-use std::{fmt::format, io::Write, sync::Arc};
+use std::{io::Write, sync::Arc};
 
-use axum::{body, extract::{Multipart, Path, State}, http::StatusCode, response::IntoResponse, Extension, Json};
+use axum::{extract::{Multipart, Path, State}, http::StatusCode, response::IntoResponse, Extension, Json};
 use cloudinary::upload::result::UploadResult;
 use serde_json::{json, Value};
 use sqlx::PgPool;
@@ -43,7 +43,7 @@ pub async fn create_user_handler(
                 otp: otp_code.clone().to_string(),
             };
 
-            match otp_creator_service(State(data.clone()), Json((otp_body))).await{
+            match otp_creator_service(State(data.clone()), Json(otp_body)).await{
                 Ok(_) => {
                     send_otp_mail(&body.email, &otp_code, &body.username).await;
 
