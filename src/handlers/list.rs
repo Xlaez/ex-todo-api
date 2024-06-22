@@ -11,7 +11,7 @@ use axum::{
 use axum_macros::debug_handler;
 use chrono::Utc;
 use serde_json::json;
-use sqlx::{PgPool};
+use sqlx::{query, PgPool};
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -107,7 +107,7 @@ pub async fn get_users_lists_handler(
     Query(pagination): Query<PaginationSchema>,
 ) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
     let page = pagination.page.unwrap_or(1);
-    let page_size = pagination.page_size.unwrap_or(10);
+    let page_size = (pagination.page_size.unwrap_or(10));
     let offset = ((page - 1) * page_size) as i64;
 
     let search_title = pagination.search_title.unwrap_or_default();
@@ -229,6 +229,31 @@ pub async fn update_list_handler(
                 serde_json::json!({"status": "fail", "message": format!("Cannot find this list")});
 
             return Err((StatusCode::NOT_FOUND, Json(error_response)));
+        }
+    }
+}
+
+pub async fn delete_list_handler(
+    State(data): State<Arc<AppState>>,
+    Path(id): Path<Uuid>,
+) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
+    let delete_request = sqlx::query!("DELETE FROM lists WHERE id = $1", id)
+        .execute(&data.db)
+        .await;
+
+    match delete_request {
+        Ok(result) => {
+            if result.rows_affected() == 1 {
+                let success_response = serde_json::json!({"status": "success", "message": "List deleted successfully"});
+                Ok(Json(success_response))
+            } else {
+                let error_response = json!({"status": "fail", "message": "List not found"});
+                Err((StatusCode::NOT_FOUND, Json(error_response)))
+            }
+        },
+        Err(e) => {
+            let error_response = serde_json::json!({"status": "fail", "message": format!("Failed to delete this list item: {:?}", e)});
+            Err((StatusCode::INTERNAL_SERVER_ERROR, Json(error_response)))
         }
     }
 }

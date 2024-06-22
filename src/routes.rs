@@ -1,15 +1,15 @@
 use crate::{
     handlers::{
-        add_list_handler, create_user_handler, get_list_by_id_handler, get_user_by_username,
-        get_users_lists_handler, health_checker_handler, login_handler, update_list_handler,
-        update_password, upload_img, verify_email,
+        add_list_handler, create_user_handler, delete_list_handler, get_list_by_id_handler,
+        get_user_by_username, get_users_lists_handler, health_checker_handler, login_handler,
+        update_list_handler, update_password, upload_img, verify_email,
     },
     middlewares::authorize_user,
     AppState,
 };
 use axum::{
     middleware::from_fn_with_state,
-    routing::{get, patch, post},
+    routing::{delete, get, patch, post},
     Router,
 };
 use std::sync::Arc;
@@ -49,6 +49,11 @@ pub fn create_router(app_state: Arc<AppState>) -> Router {
         .route(
             "/api/lists/list",
             patch(update_list_handler).layer(from_fn_with_state(app_state.clone(), authorize_user)),
+        )
+        .route(
+            "/api/lists/list/:id",
+            delete(delete_list_handler)
+                .layer(from_fn_with_state(app_state.clone(), authorize_user)),
         )
         .with_state(app_state)
 }
