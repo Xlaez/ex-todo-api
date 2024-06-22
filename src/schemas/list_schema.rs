@@ -27,3 +27,12 @@ pub struct PaginationSchema {
     pub page_size: Option<usize>,
     pub search_title: Option<String>,
 }
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct UpdateListSchema {
+    pub title: Option<String>,
+    pub descr: Option<String>,
+    pub body: Option<String>,
+    pub importance: Option<String>, // high, medium , low
+    pub id: Uuid,
+}
