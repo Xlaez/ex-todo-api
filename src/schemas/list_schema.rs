@@ -35,4 +35,5 @@ pub struct UpdateListSchema {
     pub body: Option<String>,
     pub importance: Option<String>, // high, medium , low
     pub id: Uuid,
+    pub updated_at: Option<chrono::DateTime<chrono::Utc>>,
 }

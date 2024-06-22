@@ -1,8 +1,8 @@
 use crate::{
     handlers::{
         add_list_handler, create_user_handler, get_list_by_id_handler, get_user_by_username,
-        get_users_lists_handler, health_checker_handler, login_handler, update_password,
-        upload_img, verify_email,
+        get_users_lists_handler, health_checker_handler, login_handler, update_list_handler,
+        update_password, upload_img, verify_email,
     },
     middlewares::authorize_user,
     AppState,
@@ -45,6 +45,10 @@ pub fn create_router(app_state: Arc<AppState>) -> Router {
             "/api/lists/:id",
             get(get_list_by_id_handler)
                 .layer(from_fn_with_state(app_state.clone(), authorize_user)),
+        )
+        .route(
+            "/api/lists/list",
+            patch(update_list_handler).layer(from_fn_with_state(app_state.clone(), authorize_user)),
         )
         .with_state(app_state)
 }
