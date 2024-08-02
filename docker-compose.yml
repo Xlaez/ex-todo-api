@@ -1,12 +1,26 @@
 version: "3.8"
 
 services:
+  backend: 
+    build: ./
+    container_name: ex_api
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql://user:password123@db:5432/todo_app?schema=public
+    ports: 
+      - "8083:8083"
+    depends_on:
+      - db
+    networks:
+      - ex_network
+      
   db:
     restart: always
     image: postgres:13-alpine
     volumes:
       - postgres_data_store:/var/lib/postgresql/data/
-       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
     env_file:
       - .env
     environment:
@@ -14,10 +28,11 @@ services:
       - POSTGRES_PASSWORD=password123
       - POSTGRES_DB=todo_app
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER"]
       interval: 5s
       timeout: 5s
       retries: 5
+
   pgadmin:
     container_name: pgadmin
     image: dpage/pgadmin4
@@ -31,3 +46,7 @@ services:
 
 volumes:
   postgres_data_store:
+
+networks:
+  ex_network:
+    driver: bridge
