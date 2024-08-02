@@ -24,6 +24,13 @@ A Simple Todo API built with Rust and Axum
 - verify email endpoint (POST) --------- */api/user/verify_email*
 - upload/update profile image (PATCH) --------- */api/user/update/img*
 - change password (PATCH) --------- */api/user/update/password*
+- get user (GET) --------- */api/user/:username*
+- add list item (POST) ----------- */api/lists/list*
+- get user's todo lists (GET) ----------- */api/lists/:id*
+- update todo list (PATCH) --------------- */api/lists/list*
+- delete todo list (DELETE) -------------- */api/lists/list:id*
+
+Note: **I'm done, it's a simple API for frontend devs to use for practice. If you are following, I'll soon deploy and provide postman documentation.**
 
 ### Usage
 
