@@ -2,7 +2,7 @@
 FROM rust:1.80-alpine3.20 as builder
 
 # Install necessary build tools and libraries
-RUN apk add --no-cache musl-dev build-base
+RUN apk add --no-cache musl-dev build-base pkgconfig openssl-dev
 
 RUN mkdir -p /usr/src/ex
 
@@ -43,4 +43,4 @@ RUN sqlx migrate run
 # Expose the application port
 EXPOSE 8083
 
-CMD ["/usr/src/ex/target/release/todo-app"]
+CMD ["/usr/src/ex/target/release/"]
