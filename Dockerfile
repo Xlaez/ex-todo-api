@@ -1,4 +1,5 @@
-FROM 1.80-alpine3.20
+# Stage 1: Build the application
+FROM rust:1.80-alpine3.20 as builder
 
 RUN mkdir -p /usr/src/ex
 
@@ -10,18 +11,35 @@ COPY src ./
 
 RUN cargo build --release
 
+# Stage 2: Create the runtime environment
 FROM debian:buster-slim
 
 WORKDIR /usr/src/ex
 
-COPY . /usr/src/ex/target/release/todo-app
+COPY --from=builder /usr/src/ex/target/release/todo-app /usr/src/ex/target/release/todo-app
 
-# ENVIRONMENTAL VARIABLES
+# Install required tools and dependencies
+RUN apt-get update && apt-get install -y \
+    pkg-config \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-EXPOSE 8083
+# Install Rust and cargo tools
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+# Install sqlx-cli
+RUN cargo install sqlx-cli
+
+# Set environment variables
+ENV DATABASE_URL=postgresql://user:password123@db:5432/todo_app?schema=public
+
+# Database setup
 
 RUN sqlx database create
 RUN sqlx migrate run
 
+# Expose the application port
+EXPOSE 8083
 
-CMD [ "cargo", "watch" ,"-q" ,"-c", "-w", "src/" ,"-x" ,"run" ]
+CMD ["/usr/src/ex/target/release/todo-app"]
