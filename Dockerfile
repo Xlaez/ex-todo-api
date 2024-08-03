@@ -1,13 +1,15 @@
 # Stage 1: Build the application
 FROM rust:1.80-alpine3.20 as builder
 
+# Install necessary build tools and libraries
+RUN apk add --no-cache musl-dev build-base
+
 RUN mkdir -p /usr/src/ex
 
 WORKDIR /usr/src/ex
 
 COPY Cargo.toml Cargo.lock ./
-
-COPY src ./
+COPY src ./src
 
 RUN cargo build --release
 
@@ -35,7 +37,6 @@ RUN cargo install sqlx-cli
 ENV DATABASE_URL=postgresql://user:password123@db:5432/todo_app?schema=public
 
 # Database setup
-
 RUN sqlx database create
 RUN sqlx migrate run
 
