@@ -20,8 +20,6 @@ COPY . /usr/src/ex/target/release/todo-app
 
 EXPOSE 8083
 
-RUN cargo install cargo-watch
-RUN cargo install sqlx-cli
 RUN sqlx database create
 RUN sqlx migrate run
 
