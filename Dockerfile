@@ -30,11 +30,12 @@ RUN apt-get update && apt-get install -y \
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 ENV PATH="/root/.cargo/bin:${PATH}"
 
+# Set environment variables
+ENV DATABASE_URL=postgresql://user:password123@db:5432/todo_app?schema=public
+
 # Install sqlx-cli
 RUN cargo install sqlx-cli
 
-# Set environment variables
-ENV DATABASE_URL=postgresql://user:password123@db:5432/todo_app?schema=public
 
 RUN cargo sqlx prepare
 
