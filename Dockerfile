@@ -36,7 +36,11 @@ RUN cargo install sqlx-cli
 # Set environment variables
 ENV DATABASE_URL=postgresql://user:password123@db:5432/todo_app?schema=public
 
+RUN cargo sqlx prepare
+
+
 # Database setup
+
 RUN sqlx database create
 RUN sqlx migrate run
 
